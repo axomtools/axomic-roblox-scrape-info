@@ -320,108 +320,132 @@ def findpossiblealts(userid, username):
     return alts[:3]
 
 def displayalldata(data, username):
-    print(f"\n=== user: {username} (id: {data['profile'].get('id', 'unknown')}) ===\n")
+    print(f"\n▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰")
+    print(f"            roblox profile: {username}")
+    print(f"▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰")
+    
     profile = data['profile']
     if 'error' not in profile:
-        print(f"username: {profile.get('name', 'n/a')}")
-        print(f"display name: {profile.get('displayName', 'n/a')}")
-        print(f"description: {profile.get('description', 'n/a')[:200]}")
+        userid = profile.get('id', 'unknown')
+        print(f"\n◉ user id: {userid}")
+        print(f"◉ username: {profile.get('name', 'n/a')}")
+        print(f"◉ display name: {profile.get('displayName', 'n/a')}")
+        print(f"◉ description: {profile.get('description', 'n/a')[:200]}")
         created = profile.get('created', 'n/a')
         if created != 'n/a':
             createddate = datetime.fromisoformat(created.replace('Z', '+00:00'))
-            print(f"account created: {createddate.strftime('%y-%m-%d %h:%m:%s')}")
-            print(f"creation timestamp raw: {created}")
+            print(f"◉ account created: {createddate.strftime('%y-%m-%d %h:%m:%s')}")
+            print(f"◉ creation timestamp raw: {created}")
             accountage = datetime.now().astimezone() - createddate
-            print(f"account age: {accountage.days} days")
-        print(f"is banned: {profile.get('isBanned', 'n/a')}")
-        print(f"has verified badge: {profile.get('hasVerifiedBadge', 'n/a')}")
+            print(f"◉ account age: {accountage.days} days")
+        print(f"◉ is banned: {profile.get('isBanned', 'n/a')}")
+        print(f"◉ has verified badge: {profile.get('hasVerifiedBadge', 'n/a')}")
     else:
-        print(f"profile error: {profile['error']}")
+        print(f"\n! profile error: {profile['error']}")
+    
     presence = data['rawpresence']
-    print(f"\npresence type: {presence.get('type', 'unknown')}")
+    print(f"\n◉ presence type: {presence.get('type', 'unknown')}")
     if presence.get('placeid'):
-        print(f"current place id: {presence.get('placeid')}")
+        print(f"◉ current place id: {presence.get('placeid')}")
     if presence.get('universeid'):
-        print(f"current universe id: {presence.get('universeid')}")
+        print(f"◉ current universe id: {presence.get('universeid')}")
     if presence.get('lastonline'):
-        print(f"last online raw: {presence.get('lastonline')}")
-    print(f"\n--- previous display names ---")
+        print(f"◉ last online raw: {presence.get('lastonline')}")
+    
+    print(f"\n▸ previous display names")
     history = data['usernamehistory']
-    for entry in history:
-        print(f"  {entry.get('name', 'unknown')} (changed on {entry.get('created', 'unknown')})")
-    if not history:
-        print("  no previous display names found")
-    print(f"\n--- social links ---")
+    if history:
+        for entry in history:
+            print(f"  • {entry.get('name', 'unknown')} → changed on {entry.get('created', 'unknown')}")
+    else:
+        print("  • none found")
+    
+    print(f"\n▸ social links")
     socials = data['sociallinks']
     if socials.get('youtube'):
-        print(f"  youtube: {socials['youtube']}")
+        print(f"  • youtube: {socials['youtube']}")
     if socials.get('twitter'):
-        print(f"  twitter/x: {socials['twitter']}")
+        print(f"  • twitter/x: {socials['twitter']}")
     if socials.get('discord'):
-        print(f"  discord: {socials['discord']}")
+        print(f"  • discord: {socials['discord']}")
     if not any(socials.values()):
-        print("  no social links found")
-    print(f"\n--- creator hub ---")
+        print("  • none found")
+    
+    print(f"\n▸ creator hub")
     creatorhub = data['creatorhub']
     if 'error' not in creatorhub:
-        print(f"  creator type: {creatorhub.get('creatorType', 'n/a')}")
-        print(f"  created items count: {creatorhub.get('createdItemsCount', 'n/a')}")
+        print(f"  • creator type: {creatorhub.get('creatorType', 'n/a')}")
+        print(f"  • created items count: {creatorhub.get('createdItemsCount', 'n/a')}")
     else:
-        print(f"  {creatorhub.get('error')}")
-    print(f"\n--- friends ---")
-    print(f"total friends: {len(data['friends'])}")
+        print(f"  • {creatorhub.get('error')}")
+    
+    print(f"\n▸ friends & connections")
+    print(f"  total friends: {len(data['friends'])}")
+    
     oldestfriends = data['frienddetails'].get('oldest', [])
     if oldestfriends:
-        print(f"oldest friends (first 3 added):")
+        print(f"  oldest friends (first 3 added):")
         for friend in oldestfriends:
-            print(f"  - {friend.get('name', 'unknown')} (id: {friend.get('id', 'unknown')})")
+            print(f"    • {friend.get('name', 'unknown')} (id: {friend.get('id', 'unknown')})")
+    
     popularfriends = data['frienddetails'].get('popular', [])
     if popularfriends:
-        print(f"\ntop 3 friends by follower count:")
+        print(f"  top 3 friends by follower count:")
         for friend in popularfriends:
-            print(f"  - {friend.get('name', 'unknown')} (id: {friend.get('id', 'unknown')}) - followers: {friend.get('followers', 0)}")
-    print(f"\n--- possible alternative accounts ---")
+            print(f"    • {friend.get('name', 'unknown')} (id: {friend.get('id', 'unknown')}) → {friend.get('followers', 0)} followers")
+    
+    print(f"  followers: {len(data['followers'])}")
+    if len(data['followers']) > 0:
+        followernames = [f.get('name', 'unknown') for f in data['followers'][:5]]
+        print(f"    recent: {', '.join(followernames)}" + (" ..." if len(data['followers']) > 5 else ""))
+    
+    print(f"  following: {len(data['followings'])}")
+    
+    print(f"\n▸ possible alternative accounts")
     alts = data.get('alts', [])
     if alts:
         for alt in alts:
-            print(f"  - {alt.get('name', 'unknown')} (id: {alt.get('id', 'unknown')}) - {alt.get('reason', 'unknown')}")
+            print(f"  • {alt.get('name', 'unknown')} (id: {alt.get('id', 'unknown')}) → {alt.get('reason', 'unknown')}")
     else:
-        print("  no likely alternative accounts found")
-    print(f"\nfollowers: {len(data['followers'])}")
-    if len(data['followers']) > 0:
-        followernames = [f.get('name', 'unknown') for f in data['followers'][:5]]
-        print(f"  recent followers: {', '.join(followernames)}" + ("..." if len(data['followers']) > 5 else ""))
-    print(f"following: {len(data['followings'])}")
-    print(f"\ngroups: {len(data['groups'])}")
+        print("  • none found")
+    
+    print(f"\n▸ groups ({len(data['groups'])})")
     for group in data['groups'][:5]:
         groupinfo = group.get('group', {})
         roleinfo = group.get('role', {})
-        print(f"  - {groupinfo.get('name', 'unknown')} (id: {groupinfo.get('id', 'unknown')}) - {roleinfo.get('name', 'unknown')} (rank {roleinfo.get('rank', 'unknown')})")
+        print(f"  • {groupinfo.get('name', 'unknown')} (id: {groupinfo.get('id', 'unknown')}) → {roleinfo.get('name', 'unknown')} (rank {roleinfo.get('rank', 'unknown')})")
     if len(data['groups']) > 5:
         print(f"  ... and {len(data['groups'])-5} more groups")
-    print(f"\nbadges earned: {len(data['badges'])}")
+    
+    print(f"\n▸ badges earned ({len(data['badges'])})")
     for badge in data['badges'][:5]:
-        print(f"  - {badge.get('name', 'unknown')} - {badge.get('displayName', 'unknown')}")
+        print(f"  • {badge.get('name', 'unknown')} → {badge.get('displayName', 'unknown')}")
     if len(data['badges']) > 5:
         print(f"  ... and {len(data['badges'])-5} more badges")
+    
     avatar = data['avatar']
     if 'error' not in avatar:
-        avatartype = avatar.get('avatarType', 'unknown')
-        print(f"\navatar type: {avatartype}")
-        playerscale = avatar.get('playerAvatarScale', 'unknown')
-        print(f"avatar scale: {playerscale}")
+        print(f"\n▸ avatar")
+        print(f"  • type: {avatar.get('avatarType', 'unknown')}")
+        print(f"  • scale: {avatar.get('playerAvatarScale', 'unknown')}")
     else:
-        print(f"\navatar error: {avatar['error']}")
+        print(f"\n▸ avatar error: {avatar['error']}")
+    
     avatarheadshot = data['avatarheadshot']
     if 'error' not in avatarheadshot and 'imageUrl' in avatarheadshot:
-        print(f"\navatar headshot url: {avatarheadshot.get('imageUrl', 'n/a')}")
+        print(f"\n▸ avatar headshot url")
+        print(f"  • {avatarheadshot.get('imageUrl', 'n/a')}")
     else:
-        print(f"\navatar headshot: unavailable")
-    print(f"\ninventory items shown: {len(data['inventory'])}")
+        print(f"\n▸ avatar headshot: unavailable")
+    
+    print(f"\n▸ inventory (showing first {len(data['inventory'])} items)")
     for item in data['inventory']:
         iteminfo = item.get('item', {})
-        print(f"  - {iteminfo.get('name', 'unknown')} (id: {iteminfo.get('id', 'unknown')})")
-    print("\n-- end of report --")
+        print(f"  • {iteminfo.get('name', 'unknown')} (id: {iteminfo.get('id', 'unknown')})")
+    
+    print(f"\n▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰")
+    print("                     end of report")
+    print("▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰\n")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
