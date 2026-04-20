@@ -2,10 +2,16 @@ import requests
 import sys
 import json
 from datetime import datetime
+import socket
 
 def fetchuserdata(username):
+    print("-- roblox info scraper by axom")
     userid = getuserid(username)
     if not userid:
+        print(f"\nfailed to fetch user data for '{username}'. possible reasons:")
+        print("  - check your internet connection")
+        print("  - try using a vpn or change dns (e.g., 8.8.8.8)")
+        print("  - the username may not exist")
         return
     data = {}
     data['profile'] = getuserprofile(userid)
@@ -22,28 +28,42 @@ def fetchuserdata(username):
     displayalldata(data, username)
 
 def getuserid(username):
-    url = f"https://users.roblox.com/v1/usernames/users"
-    payload = {"usernames": [username]}
-    try:
-        resp = requests.post(url, json=payload)
-        if resp.status_code == 200:
-            users = resp.json().get('data', [])
-            if users:
-                return users[0]['id']
+    urls = [
+        "https://users.roblox.com/v1/usernames/users",
+        "https://www.roblox.com/api/users/get-by-username?username={}".format(username)
+    ]
+    for url in urls:
+        try:
+            if "usernames/users" in url:
+                payload = {"usernames": [username]}
+                resp = requests.post(url, json=payload, timeout=10)
+                if resp.status_code == 200:
+                    users = resp.json().get('data', [])
+                    if users:
+                        return users[0]['id']
             else:
-                print(f"user '{username}' not found.")
-                return None
-        else:
-            print(f"failed to fetch user id (http {resp.status_code}).")
-            return None
-    except Exception as e:
-        print(f"error fetching user id: {e}")
-        return None
+                resp = requests.get(url, timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get('Id'):
+                        return data['Id']
+        except Exception as e:
+            continue
+    try:
+        alturl = f"https://api.roblox.com/users/get-by-username?username={username}"
+        resp = requests.get(alturl, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get('Id'):
+                return data['Id']
+    except:
+        pass
+    return None
 
 def getuserprofile(userid):
     url = f"https://users.roblox.com/v1/users/{userid}"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             return resp.json()
         else:
@@ -55,7 +75,7 @@ def getuserpresence(userids):
     url = "https://presence.roblox.com/v1/presence/users"
     payload = {"userIds": userids}
     try:
-        resp = requests.post(url, json=payload)
+        resp = requests.post(url, json=payload, timeout=10)
         if resp.status_code == 200:
             presences = resp.json().get('userPresences', [])
             if presences:
@@ -70,7 +90,7 @@ def getuserpresence(userids):
 def getuserfriends(userid):
     url = f"https://friends.roblox.com/v1/users/{userid}/friends"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             return data.get('data', [])
@@ -82,7 +102,7 @@ def getuserfriends(userid):
 def getuserfollowers(userid):
     url = f"https://friends.roblox.com/v1/users/{userid}/followers"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             return data.get('data', [])
@@ -94,7 +114,7 @@ def getuserfollowers(userid):
 def getuserfollowings(userid):
     url = f"https://friends.roblox.com/v1/users/{userid}/followings"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             return data.get('data', [])
@@ -106,7 +126,7 @@ def getuserfollowings(userid):
 def getusergroups(userid):
     url = f"https://groups.roblox.com/v1/users/{userid}/groups/roles"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             return data.get('data', [])
@@ -118,7 +138,7 @@ def getusergroups(userid):
 def getuserbadges(userid):
     url = f"https://badges.roblox.com/v1/users/{userid}/badges?limit=100&sortOrder=Asc"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             return data.get('data', [])
@@ -130,7 +150,7 @@ def getuserbadges(userid):
 def getuseravatar(userid):
     url = f"https://avatar.roblox.com/v1/users/{userid}/avatar"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             return resp.json()
         else:
@@ -141,7 +161,7 @@ def getuseravatar(userid):
 def getuseravatarheadshot(userid):
     url = f"https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds={userid}&size=420x420&format=Png&isCircular=false"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             if data.get('data'):
@@ -156,7 +176,7 @@ def getuseravatarheadshot(userid):
 def getuserinventory(userid):
     url = f"https://inventory.roblox.com/v1/users/{userid}/items/1?limit=10"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             return data.get('data', [])
@@ -168,7 +188,7 @@ def getuserinventory(userid):
 def getusernamehistory(userid):
     url = f"https://users.roblox.com/v1/users/{userid}/username-history?limit=10"
     try:
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             return data.get('data', [])
@@ -178,17 +198,16 @@ def getusernamehistory(userid):
         return []
 
 def displayalldata(data, username):
-    print("-- roblox info scraper by axom")
     print(f"\n=== user: {username} (id: {data['profile'].get('id', 'unknown')}) ===\n")
     profile = data['profile']
     if 'error' not in profile:
         print(f"username: {profile.get('name', 'n/a')}")
         print(f"display name: {profile.get('displayName', 'n/a')}")
-        print(f"description: {profile.get('description', 'n/a')}")
+        print(f"description: {profile.get('description', 'n/a')[:200]}")
         created = profile.get('created', 'n/a')
         if created != 'n/a':
             createddate = datetime.fromisoformat(created.replace('Z', '+00:00'))
-            print(f"account created: {createddate.strftime('%Y-%m-%d %h:%m:%s')}")
+            print(f"account created: {createddate.strftime('%y-%m-%d %h:%m:%s')}")
             accountage = datetime.now().astimezone() - createddate
             print(f"account age: {accountage.days} days")
         print(f"is banned: {profile.get('isBanned', 'n/a')}")
@@ -196,7 +215,7 @@ def displayalldata(data, username):
     else:
         print(f"profile error: {profile['error']}")
     presence = data['presence']
-    if 'error' not in presence:
+    if 'error' not in presence and 'userPresenceType' in presence:
         statustypes = {0: 'offline', 1: 'online', 2: 'in game', 3: 'in studio', 4: 'invisible'}
         statustype = presence.get('userPresenceType', 'unknown')
         status = statustypes.get(statustype, 'unknown')
@@ -208,7 +227,7 @@ def displayalldata(data, username):
             lastonlinedate = datetime.fromisoformat(lastonline.replace('Z', '+00:00'))
             print(f"last online: {lastonlinedate.strftime('%y-%m-%d %h:%m:%s')}")
     else:
-        print(f"presence error: {presence['error']}")
+        print(f"presence: unavailable")
     print(f"\nfriends: {len(data['friends'])}")
     if len(data['friends']) > 0:
         friendnames = [f.get('name', 'unknown') for f in data['friends'][:5]]
@@ -234,25 +253,27 @@ def displayalldata(data, username):
     if 'error' not in avatar:
         avatartype = avatar.get('avatarType', 'unknown')
         print(f"\navatar type: {avatartype}")
-        print(f"avatar scale: {avatar.get('avatarScaling', 'unknown')}")
+        playerscale = avatar.get('playerAvatarScale', 'unknown')
+        print(f"avatar scale: {playerscale}")
     else:
         print(f"\navatar error: {avatar['error']}")
     avatarheadshot = data['avatarheadshot']
-    if 'error' not in avatarheadshot:
-        print(f"\navatar headshot: {avatarheadshot.get('imageUrl', 'n/a')}")
+    if 'error' not in avatarheadshot and 'imageUrl' in avatarheadshot:
+        print(f"\navatar headshot url: {avatarheadshot.get('imageUrl', 'n/a')}")
     else:
-        print(f"\navatar headshot error: {avatarheadshot['error']}")
+        print(f"\navatar headshot: unavailable")
     print(f"\ninventory items shown: {len(data['inventory'])}")
     for item in data['inventory']:
         iteminfo = item.get('item', {})
         print(f"  - {iteminfo.get('name', 'unknown')} (id: {iteminfo.get('id', 'unknown')})")
     print(f"\nusername history entries: {len(data['usernamehistory'])}")
     for entry in data['usernamehistory']:
-        print(f"  - {entry.get('name', 'unknown')} (changed on {entry.get('created', 'unknown')})")
+        print(f"  - {entry.get('name', 'unknown')} (changed on {entry.get('created', 'unknown')[:10]})")
     print("\n-- end of report --")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
+        print("-- roblox info scraper by axom")
         print("usage: python axomicrblxinfo usernameofplayer")
         sys.exit(1)
     username = sys.argv[1]
