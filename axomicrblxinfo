@@ -2,16 +2,12 @@ import requests
 import sys
 import json
 from datetime import datetime
-import socket
 
 def fetchuserdata(username):
     print("-- roblox info scraper by axom")
     userid = getuserid(username)
     if not userid:
-        print(f"\nfailed to fetch user data for '{username}'. possible reasons:")
-        print("  - check your internet connection")
-        print("  - try using a vpn or change dns (e.g., 8.8.8.8)")
-        print("  - the username may not exist")
+        print(f"\nfailed to fetch user data for '{username}'. the username may not exist")
         return
     data = {}
     data['profile'] = getuserprofile(userid)
@@ -25,6 +21,11 @@ def fetchuserdata(username):
     data['avatarheadshot'] = getuseravatarheadshot(userid)
     data['inventory'] = getuserinventory(userid)
     data['usernamehistory'] = getusernamehistory(userid)
+    data['sociallinks'] = getsociallinks(userid)
+    data['creatorhub'] = getcreatorhubinfo(userid)
+    data['frienddetails'] = getfrienddetails(userid)
+    data['rawpresence'] = getrawpresence(userid)
+    data['alts'] = findpossiblealts(userid, username)
     displayalldata(data, username)
 
 def getuserid(username):
@@ -197,6 +198,120 @@ def getusernamehistory(userid):
     except Exception as e:
         return []
 
+def getsociallinks(userid):
+    socials = {'youtube': None, 'twitter': None, 'discord': None}
+    url = f"https://friends.roblox.com/v1/users/{userid}/social-networks"
+    try:
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            for link in data.get('data', []):
+                platform = link.get('platform', '').lower()
+                if platform == 'youtube':
+                    socials['youtube'] = link.get('address')
+                elif platform == 'twitter' or platform == 'x':
+                    socials['twitter'] = link.get('address')
+                elif platform == 'discord':
+                    socials['discord'] = link.get('address')
+        return socials
+    except:
+        return socials
+
+def getcreatorhubinfo(userid):
+    try:
+        url = f"https://create.roblox.com/v1/creators/{userid}/profile"
+        resp = requests.get(url, timeout=10)
+        if resp.status_code == 200:
+            return resp.json()
+        else:
+            return {"error": "creator hub data unavailable"}
+    except:
+        return {"error": "creator hub data unavailable"}
+
+def getfrienddetails(userid):
+    friends = getuserfriends(userid)
+    if not friends:
+        return {'oldest': [], 'popular': []}
+    friendswithfollowers = []
+    for friend in friends[:50]:
+        fid = friend.get('id')
+        if fid:
+            followers = getuserfollowers(fid)
+            friendswithfollowers.append({'id': fid, 'name': friend.get('name'), 'followers': len(followers)})
+    sortedbyfollowers = sorted(friendswithfollowers, key=lambda x: x['followers'], reverse=True)
+    return {'oldest': friends[:3], 'popular': sortedbyfollowers[:3]}
+
+def getrawpresence(userid):
+    url = f"https://presence.roblox.com/v1/presence/users"
+    payload = {"userIds": [userid]}
+    try:
+        resp = requests.post(url, json=payload, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            presences = data.get('userPresences', [])
+            if presences:
+                presence = presences[0]
+                presencetype = presence.get('userPresenceType', 0)
+                types = {0: 'offline', 1: 'online', 2: 'in game', 3: 'in studio', 4: 'invisible'}
+                return {'type': types.get(presencetype, 'unknown'), 'raw': presencetype, 'lastonline': presence.get('lastOnline'), 'placeid': presence.get('placeId'), 'universeid': presence.get('universeId')}
+        return {'type': 'unknown', 'raw': None}
+    except:
+        return {'type': 'unknown', 'raw': None}
+
+def findpossiblealts(userid, username):
+    alts = []
+    try:
+        followers = getuserfollowers(userid)
+        for follower in followers[:30]:
+            if follower.get('name', '').lower().startswith(username.lower() + '_') or follower.get('name', '').lower().startswith(username.lower() + '0') or follower.get('name', '').lower().startswith(username.lower() + '1'):
+                alts.append({'name': follower.get('name'), 'id': follower.get('id'), 'reason': 'similar username (follower)'})
+        following = getuserfollowings(userid)
+        for follow in following[:30]:
+            if follow.get('name', '').lower().startswith(username.lower() + '_') or follow.get('name', '').lower().startswith(username.lower() + '0') or follow.get('name', '').lower().startswith(username.lower() + '1'):
+                if not any(alt['id'] == follow.get('id') for alt in alts):
+                    alts.append({'name': follow.get('name'), 'id': follow.get('id'), 'reason': 'similar username (following)'})
+        if len(alts) < 3:
+            try:
+                searchurl = f"https://users.roblox.com/v1/usernames/users"
+                possiblealts = [f"{username}1", f"{username}2", f"{username}_alt", f"{username}real", f"{username}123"]
+                for altname in possiblealts:
+                    if len(alts) >= 3:
+                        break
+                    payload = {"usernames": [altname]}
+                    resp = requests.post(searchurl, json=payload, timeout=10)
+                    if resp.status_code == 200:
+                        users = resp.json().get('data', [])
+                        if users and users[0]['id'] != userid:
+                            alts.append({'name': altname, 'id': users[0]['id'], 'reason': 'common alt naming pattern'})
+            except:
+                pass
+        if len(alts) < 3:
+            try:
+                url = f"https://groups.roblox.com/v1/users/{userid}/groups/roles"
+                resp = requests.get(url, timeout=10)
+                if resp.status_code == 200:
+                    groups = resp.json().get('data', [])
+                    for group in groups[:10]:
+                        if len(alts) >= 3:
+                            break
+                        groupid = group.get('group', {}).get('id')
+                        if groupid:
+                            membersurl = f"https://groups.roblox.com/v1/groups/{groupid}/users?limit=100"
+                            membersresp = requests.get(membersurl, timeout=10)
+                            if membersresp.status_code == 200:
+                                members = membersresp.json().get('data', [])
+                                for member in members:
+                                    membername = member.get('user', {}).get('username', '')
+                                    if membername.lower().startswith(username.lower()) and member.get('user', {}).get('userId') != userid:
+                                        if not any(alt['id'] == member.get('user', {}).get('userId') for alt in alts):
+                                            alts.append({'name': membername, 'id': member.get('user', {}).get('userId'), 'reason': 'shared group membership'})
+                                            break
+            except:
+                pass
+    except:
+        pass
+    return alts[:3]
+
 def displayalldata(data, username):
     print(f"\n=== user: {username} (id: {data['profile'].get('id', 'unknown')}) ===\n")
     profile = data['profile']
@@ -208,31 +323,64 @@ def displayalldata(data, username):
         if created != 'n/a':
             createddate = datetime.fromisoformat(created.replace('Z', '+00:00'))
             print(f"account created: {createddate.strftime('%y-%m-%d %h:%m:%s')}")
+            print(f"creation timestamp raw: {created}")
             accountage = datetime.now().astimezone() - createddate
             print(f"account age: {accountage.days} days")
         print(f"is banned: {profile.get('isBanned', 'n/a')}")
         print(f"has verified badge: {profile.get('hasVerifiedBadge', 'n/a')}")
     else:
         print(f"profile error: {profile['error']}")
-    presence = data['presence']
-    if 'error' not in presence and 'userPresenceType' in presence:
-        statustypes = {0: 'offline', 1: 'online', 2: 'in game', 3: 'in studio', 4: 'invisible'}
-        statustype = presence.get('userPresenceType', 'unknown')
-        status = statustypes.get(statustype, 'unknown')
-        print(f"status: {status}")
-        if status == 'in game':
-            print(f"current game id: {presence.get('universeId', 'n/a')}")
-        lastonline = presence.get('lastOnline', 'n/a')
-        if lastonline != 'n/a':
-            lastonlinedate = datetime.fromisoformat(lastonline.replace('Z', '+00:00'))
-            print(f"last online: {lastonlinedate.strftime('%y-%m-%d %h:%m:%s')}")
+    presence = data['rawpresence']
+    print(f"\npresence type: {presence.get('type', 'unknown')}")
+    if presence.get('placeid'):
+        print(f"current place id: {presence.get('placeid')}")
+    if presence.get('universeid'):
+        print(f"current universe id: {presence.get('universeid')}")
+    if presence.get('lastonline'):
+        print(f"last online raw: {presence.get('lastonline')}")
+    print(f"\n--- previous display names ---")
+    history = data['usernamehistory']
+    for entry in history:
+        print(f"  {entry.get('name', 'unknown')} (changed on {entry.get('created', 'unknown')})")
+    if not history:
+        print("  no previous display names found")
+    print(f"\n--- social links ---")
+    socials = data['sociallinks']
+    if socials.get('youtube'):
+        print(f"  youtube: {socials['youtube']}")
+    if socials.get('twitter'):
+        print(f"  twitter/x: {socials['twitter']}")
+    if socials.get('discord'):
+        print(f"  discord: {socials['discord']}")
+    if not any(socials.values()):
+        print("  no social links found")
+    print(f"\n--- creator hub ---")
+    creatorhub = data['creatorhub']
+    if 'error' not in creatorhub:
+        print(f"  creator type: {creatorhub.get('creatorType', 'n/a')}")
+        print(f"  created items count: {creatorhub.get('createdItemsCount', 'n/a')}")
     else:
-        print(f"presence: unavailable")
-    print(f"\nfriends: {len(data['friends'])}")
-    if len(data['friends']) > 0:
-        friendnames = [f.get('name', 'unknown') for f in data['friends'][:5]]
-        print(f"  recent friends: {', '.join(friendnames)}" + ("..." if len(data['friends']) > 5 else ""))
-    print(f"followers: {len(data['followers'])}")
+        print(f"  {creatorhub.get('error')}")
+    print(f"\n--- friends ---")
+    print(f"total friends: {len(data['friends'])}")
+    oldestfriends = data['frienddetails'].get('oldest', [])
+    if oldestfriends:
+        print(f"oldest friends (first 3 added):")
+        for friend in oldestfriends:
+            print(f"  - {friend.get('name', 'unknown')} (id: {friend.get('id', 'unknown')})")
+    popularfriends = data['frienddetails'].get('popular', [])
+    if popularfriends:
+        print(f"\ntop 3 friends by follower count:")
+        for friend in popularfriends:
+            print(f"  - {friend.get('name', 'unknown')} (followers: {friend.get('followers', 0)})")
+    print(f"\n--- possible alternative accounts ---")
+    alts = data.get('alts', [])
+    if alts:
+        for alt in alts:
+            print(f"  - {alt.get('name', 'unknown')} (id: {alt.get('id', 'unknown')}) - {alt.get('reason', 'unknown')}")
+    else:
+        print("  no likely alternative accounts found")
+    print(f"\nfollowers: {len(data['followers'])}")
     if len(data['followers']) > 0:
         followernames = [f.get('name', 'unknown') for f in data['followers'][:5]]
         print(f"  recent followers: {', '.join(followernames)}" + ("..." if len(data['followers']) > 5 else ""))
@@ -266,9 +414,6 @@ def displayalldata(data, username):
     for item in data['inventory']:
         iteminfo = item.get('item', {})
         print(f"  - {iteminfo.get('name', 'unknown')} (id: {iteminfo.get('id', 'unknown')})")
-    print(f"\nusername history entries: {len(data['usernamehistory'])}")
-    for entry in data['usernamehistory']:
-        print(f"  - {entry.get('name', 'unknown')} (changed on {entry.get('created', 'unknown')[:10]})")
     print("\n-- end of report --")
 
 if __name__ == "__main__":
