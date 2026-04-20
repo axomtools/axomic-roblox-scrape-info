@@ -235,11 +235,16 @@ def getfrienddetails(userid):
     friendswithfollowers = []
     for friend in friends[:50]:
         fid = friend.get('id')
+        fname = friend.get('name', 'unknown')
         if fid:
             followers = getuserfollowers(fid)
-            friendswithfollowers.append({'id': fid, 'name': friend.get('name'), 'followers': len(followers)})
+            followercount = len(followers)
+            friendswithfollowers.append({'id': fid, 'name': fname, 'followers': followercount})
     sortedbyfollowers = sorted(friendswithfollowers, key=lambda x: x['followers'], reverse=True)
-    return {'oldest': friends[:3], 'popular': sortedbyfollowers[:3]}
+    oldestfriends = []
+    for friend in friends[:3]:
+        oldestfriends.append({'id': friend.get('id', 'unknown'), 'name': friend.get('name', 'unknown')})
+    return {'oldest': oldestfriends, 'popular': sortedbyfollowers[:3]}
 
 def getrawpresence(userid):
     url = f"https://presence.roblox.com/v1/presence/users"
@@ -263,22 +268,23 @@ def findpossiblealts(userid, username):
     try:
         followers = getuserfollowers(userid)
         for follower in followers[:30]:
-            if follower.get('name', '').lower().startswith(username.lower() + '_') or follower.get('name', '').lower().startswith(username.lower() + '0') or follower.get('name', '').lower().startswith(username.lower() + '1'):
-                alts.append({'name': follower.get('name'), 'id': follower.get('id'), 'reason': 'similar username (follower)'})
+            fname = follower.get('name', '')
+            if fname.lower().startswith(username.lower() + '_') or fname.lower().startswith(username.lower() + '0') or fname.lower().startswith(username.lower() + '1'):
+                alts.append({'name': fname, 'id': follower.get('id'), 'reason': 'similar username (follower)'})
         following = getuserfollowings(userid)
         for follow in following[:30]:
-            if follow.get('name', '').lower().startswith(username.lower() + '_') or follow.get('name', '').lower().startswith(username.lower() + '0') or follow.get('name', '').lower().startswith(username.lower() + '1'):
+            fname = follow.get('name', '')
+            if fname.lower().startswith(username.lower() + '_') or fname.lower().startswith(username.lower() + '0') or fname.lower().startswith(username.lower() + '1'):
                 if not any(alt['id'] == follow.get('id') for alt in alts):
-                    alts.append({'name': follow.get('name'), 'id': follow.get('id'), 'reason': 'similar username (following)'})
+                    alts.append({'name': fname, 'id': follow.get('id'), 'reason': 'similar username (following)'})
         if len(alts) < 3:
             try:
-                searchurl = f"https://users.roblox.com/v1/usernames/users"
                 possiblealts = [f"{username}1", f"{username}2", f"{username}_alt", f"{username}real", f"{username}123"]
                 for altname in possiblealts:
                     if len(alts) >= 3:
                         break
                     payload = {"usernames": [altname]}
-                    resp = requests.post(searchurl, json=payload, timeout=10)
+                    resp = requests.post("https://users.roblox.com/v1/usernames/users", json=payload, timeout=10)
                     if resp.status_code == 200:
                         users = resp.json().get('data', [])
                         if users and users[0]['id'] != userid:
@@ -302,9 +308,10 @@ def findpossiblealts(userid, username):
                                 members = membersresp.json().get('data', [])
                                 for member in members:
                                     membername = member.get('user', {}).get('username', '')
-                                    if membername.lower().startswith(username.lower()) and member.get('user', {}).get('userId') != userid:
-                                        if not any(alt['id'] == member.get('user', {}).get('userId') for alt in alts):
-                                            alts.append({'name': membername, 'id': member.get('user', {}).get('userId'), 'reason': 'shared group membership'})
+                                    memberid = member.get('user', {}).get('userId')
+                                    if membername.lower().startswith(username.lower()) and memberid != userid:
+                                        if not any(alt['id'] == memberid for alt in alts):
+                                            alts.append({'name': membername, 'id': memberid, 'reason': 'shared group membership'})
                                             break
             except:
                 pass
@@ -372,7 +379,7 @@ def displayalldata(data, username):
     if popularfriends:
         print(f"\ntop 3 friends by follower count:")
         for friend in popularfriends:
-            print(f"  - {friend.get('name', 'unknown')} (followers: {friend.get('followers', 0)})")
+            print(f"  - {friend.get('name', 'unknown')} (id: {friend.get('id', 'unknown')}) - followers: {friend.get('followers', 0)}")
     print(f"\n--- possible alternative accounts ---")
     alts = data.get('alts', [])
     if alts:
