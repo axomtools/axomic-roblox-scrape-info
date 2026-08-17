@@ -334,7 +334,7 @@ def displayalldata(data, username):
         created = profile.get('created', 'n/a')
         if created != 'n/a':
             createddate = datetime.fromisoformat(created.replace('Z', '+00:00'))
-            print(f"◉ account created: {createddate.strftime('%y-%m-%d %h:%m:%s')}")
+            print(f"◉ account created: {createddate.strftime('%Y-%m-%d %I:%M:%S %p')}")
             print(f"◉ creation timestamp raw: {created}")
             accountage = datetime.now().astimezone() - createddate
             print(f"◉ account age: {accountage.days} days")
